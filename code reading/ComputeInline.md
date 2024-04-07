@@ -10,7 +10,7 @@
 
 ### Ⅰ. 访问者（Visitor） 模式
 访问者模式是一种行为型设计模式，它将算法与其所作用的对象分离开来，使得能够在不改变对象结构的前提下，对对象中的元素进行新的操作。
-该模式的核心思想是，定义一个访问者对象，并将其传递给需要被访问的对象，在对象接受访问者的访问时，会调用访问者对象中的方法，在该方法中实现对象对于访问者的响应操作。
+该模式的核心思想是，定义一个访问者对象，并将其传递给需要被访问的对象，在对象接受访问者的访问时，会调用访问者对象中的函数，在该函数中实现对象对于访问者的响应操作。
 
 以下图为例。
 
@@ -24,9 +24,11 @@
 结合上面分析，我们可以初步分析访问者模式是怎么一回事儿：在每个游客自己内部，把对每个景点想操作的行为定义出来，然后在每个景点，准备个接口，把游客迎进来，
 最后呢，把这个游客迎进来之后呢，执行这个游客里面定义的，关于自己的行为。
 
-实现方式上，一般为，基类(BaseVisitor)含有所有节点（景点）的 visit 方法，这个 visit 方法什么都不做，只是按 dfs 的顺序调用其它节点（景点）的 visit 方法。
-子类 visitor 继承基类，重写某些节点的 visit 方法（比如张三是子类 visitor，他到了断桥残雪，就会会回味一下张祜的诗句）。在子类 visit 方法的结尾，
-如果想继续以 dfs 的顺序遍历，就应该调用基类的 visit 方法，再 return；如果想直接返回，直接 return 即可。
+实现方式上，一般为，父类(BaseVisitor)含有所有节点（景点）的 visit 函数，这个 visit 函数什么都不做，只是按 dfs 的顺序调用其它节点（景点）的 visit 函数。
+子类 visitor 继承父类，重写某些节点的 visit 函数（比如张三是子类 visitor，他到了断桥残雪，就会会回味一下张祜的诗句）。在子类 visit 函数的结尾，
+如果想继续以 dfs 的顺序遍历，就应该调用父类的 visit 函数，再 return；如果想直接返回，直接 return 即可。
+
+此模式常用于 CST（具体语法树） 到 AST（抽象语法树） 的转换。
 
 ## 2. 主要流程
 
@@ -163,5 +165,75 @@ TODO
 
 ## 4. ComputeInliner
 
-TODO
+由上文 inliner(&root) 及相关源码可知， ComputeInliner 的父类重载了 () 运算符。
+
+```C++
+void BaseInliner::operator()(Expr* expr) {
+  IRMutator::Visit(&tgt_stmt, &tgt_stmt);
+  IRMutator::Visit(expr, expr);
+}
+```
+
+TODO：为什么 Visit 要传两个一样的参数?
+
+TODO: IRMutator::Visit(&tgt_stmt, &tgt_stmt), IRMutator::Visit(expr, expr) 分别都有什么作用？
+
+重载函数调用了 visit 函数。而 ComputeInliner 又重写了 Visit(const ir::Load* expr, Expr* op)。
+
+```C++
+void ComputeInliner::Visit(const ir::Load* expr, Expr* op) {
+  if ((expr->tensor).as_tensor_ref()->name == inlined_tensor_->name) {
+    *op = ReplaceInlinedTensor(op);
+    return;
+  }
+  IRMutator::Visit(expr, op);
+}
+```
+
+由 [背景知识](#1-背景知识) 可知，父类 Visitor 以 dfs 的顺序遍历。子类调用父类的 visit 函数，也会以 dfs 的顺序遍历。
+故而，上面代码的逻辑即为：在未遍历到要做内联化的节点时（节点的类型不是 ir::Load* 或者 (expr->tensor).as_tensor_ref()->name ！= inlined_tensor_->name），以 dfs 的顺序遍历；
+遍历到要做内联化的节点后，调用 ReplaceInlinedTensor 函数，并直接返回。
+
+```C++
+//! Replace the 'Load' node on the tensor to 'Load' node of its producers.
+Expr ComputeInliner::ReplaceInlinedTensor(Expr* load) {
+  CHECK(load->As<ir::Load>());
+  SetIndexSubstitution(load->As<ir::Load>()->indices);
+  Expr value_copy = ir::ir_utils::IRCopy(inlined_store_.As<Store>()->value);
+  ReplaceExpr(&value_copy, idx_sub_var_, idx_sub_expr_);
+  return value_copy;
+}
+```
+
+主要步骤
+- 设置 idx_sub_var_， idx_sub_expr_（SetIndexSubstitution）
+- 复制一份 Expr
+- 替换
+
+```C++
+void BaseInliner::SetIndexSubstitution(const std::vector<Expr>& indices) {
+  CHECK_EQ(indices.size(), idx_vars_.size());
+  int n = idx_vars_.size();
+  idx_sub_var_.reserve(n);
+  idx_sub_expr_.reserve(n);
+  for (int i = 0; i < n; ++i) {
+    idx_sub_var_.push_back(idx_vars_[i]);
+    idx_sub_expr_.push_back(indices[i]);
+  }
+}
+```
+
+需要注意的是，idx_vars_ 有注释：The indices used for indexing the buffer to be inlined 。可见 idx_sub_var_ 对应要被内联消除的索引信息，
+idx_sub_expr_ 对应 consumer 的索引信息。
+
+```C++
+Expr IRCopy(Expr x, bool copy_buffer_node) {
+  IRCopyVisitor visitor(copy_buffer_node);
+  auto copied = visitor.Visit(&x);
+  return copied;
+}
+```
+
+调用 IRCopyVisitor::Visit 
+
 
