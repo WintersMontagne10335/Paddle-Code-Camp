@@ -157,6 +157,10 @@ void StScheduleImpl::ComputeInline(const Expr& schedule_block) {
 - 去除即将内联化的 block
 - 计算内联化
 
+TODO：root 的作用及实现过程
+
+TODO：store 的作用及实现过程
+
 我们接下来重点分析 LeafBlockRemovalPlan 与 ComputeInliner，探究一下实现细节。
 
 ## 3. LeafBlockRemovalPlan
@@ -234,6 +238,96 @@ Expr IRCopy(Expr x, bool copy_buffer_node) {
 }
 ```
 
-调用 IRCopyVisitor::Visit 
+调用 IRCopyVisitor::Visit 函数。IRCopyVisitor 重写了很多入参类型不同的 Visit 函数。作用均为复制该节点的数据并返回。
 
+但是，这里调用的是哪一个呢？
 
+从上文的 void ComputeInliner::Visit(const ir::Load* expr, Expr* op) 可知， Visit 的返回值 copied 经过层层传递，
+最终赋值给了 *op ，而 op 与 expr 类型一致，为 `ir::Load*` 。所以这里推断调用的是：
+
+```C++
+  Expr Visit(const Load* op) override {
+    auto tensor = Visit(&op->tensor);
+    std::vector<Expr> indices;
+    for (auto& idx : op->indices) {
+      indices.push_back(Visit(&idx));
+    }
+    return Load::Make(tensor, indices);
+  }
+```
+
+通过 Visit 遍历子节点，获取复制的 tensor 与 indices，封装成 Load 并返回。再看 tensor 是如何复制的。
+
+```C++
+  Expr Visit(const _Tensor_* op) override {
+    if (tensor_map.count(op->name)) {
+      return tensor_map[op->name];
+    }
+
+    auto shape = Visit(op->shape);
+    auto domain = Visit(op->domain);
+    auto buffer_expr = Expr(op->buffer);
+    // TODO(Superjomn) copy the operation.
+    auto operaion = op->operation;
+    auto name = op->name;
+    auto tensor = make_shared<_Tensor_>();
+
+    // tensor->buffer = op->buffer;
+    if (buffer_expr.defined()) {
+      if (copy_buffer_node) {
+        auto buffer = Visit(&buffer_expr);
+        tensor->buffer = buffer.as_buffer_ref();
+      } else {
+        tensor->buffer = op->buffer;
+      }
+    }
+    tensor->domain = domain;
+    tensor->shape = shape;
+    tensor->reduce_axis = op->reduce_axis;
+    tensor->operation = operaion;
+    tensor->name = name;
+    tensor->set_type(op->type());
+    tensor->axis_ = op->axis_;
+
+    tensor_map[tensor->name] = tensor;
+
+    return tensor;
+  }
+```
+
+如果 tensor_map 中缓存有 op->name 对应的tensor，则直接返回。否则通过 Visit 遍历子节点组装返回。
+
+我们再回过头来，看一下 ReplaceExpr 是如何实现的。
+
+```C++
+void ReplaceExpr(Expr* source,
+                 const std::vector<Var>& replaced,
+                 const std::vector<Expr>& candidates) {
+  CHECK_EQ(replaced.size(), candidates.size())
+      << "In ReplaceExpr, the size of Vars to be replaced must be equal to the "
+         "size of candidate Exprs! Please check.";
+  if (replaced.empty()) return;
+  std::map<Var, Expr, CompVar> replacing_map;
+  for (int i = 0; i < replaced.size(); ++i) {
+    // If the Var to be replaced is equal to the candidate, we skip it.
+    if (candidates[i].is_var() && candidates[i].as_var_ref() == replaced[i])
+      continue;
+    replacing_map[replaced[i]] = candidates[i];
+  }
+  MappingVarToExprMutator mapper(replacing_map);
+  mapper(source);
+  return;
+}
+```
+
+构建 replacing_map ，建立 replaced 与 candidates的一一映射关系。然后通过 MappingVarToExprMutator 调用 Visit 函数。
+
+```C++
+  void Visit(const ir::_Var_* expr, Expr* op) override {
+    if (replacing_map_.count(op->as_var_ref())) {
+      *op = replacing_map_.at(op->as_var_ref());
+    }
+  }
+```
+
+替换 value_copy 子节点的索引信息。
