@@ -4,26 +4,12 @@
 
 ![无标题1](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/7e63d98e-4a33-4198-8645-f9cd229f60a2)
 
+![2484592-20210730140458592-91425515](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/46a4447e-f110-43e6-9e8d-ca1571951de6)
 
-ih = oh * stride_h - pad_h + fh
+![2484592-20210730140601887-577353035](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/f3aeb0ef-3953-4bec-b71c-63192f4eb704)
 
-iw = ow * stride_w - pad_w + fw
 
-NCHW32
 
-``` C++
-#define MMA_M 16
-#define MMA_N 8
-#define MMA_K 16
-
-#define BLOCK_M 256
-#define BLOCK_N 128
-
-#define WARP_M 64
-#define WARP_N 64
-```
-
-int4读取
 
 ![2484592-20210730140646081-102511261](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/ac8f84d6-d14c-4dff-9467-5796ed9086cd)
 
