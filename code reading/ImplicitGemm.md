@@ -1,15 +1,30 @@
-# 一、 ImplicitGemm
+![2484592-20210730140115346-1574517004](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/bf91f173-7769-4989-a263-7087878a0889)
 
-- [一、ImplicitGemm](#一-ImplicitGemm)
-  - [0. 背景知识](#0-背景知识)
+![无标题](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/fe851ea7-63c5-4265-8b56-a2790642a202)
 
-## 0. 背景知识
+![无标题1](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/7e63d98e-4a33-4198-8645-f9cd229f60a2)
 
-访问全局存储（Global Memory）时，同一 Warp 中的相邻线程访问连续的地址，访存请求会被合并，合并的访存能够最大化 Global Memory 的吞吐。
 
-访问 Global Memory 时，尽可能使用最宽的数据类型（float4）进行访问，这样可以最大化访存指令的利用率。
+ih = oh * stride_h - pad_h + fh
 
-CUDA 的共享存储（Shared Memory）按照每 4Bytes 划分为一个 bank，共分为 32 个 bank。当同一 Warp 中的线程访问同一 bank 的不同地址时会发生冲突（bank conflict）。
-无 bank conflict 的访存模式才能最大化 Shared Memory 的吞吐。
+iw = ow * stride_w - pad_w + fw
 
-TODO
+NCHW32
+
+``` C++
+#define MMA_M 16
+#define MMA_N 8
+#define MMA_K 16
+
+#define BLOCK_M 256
+#define BLOCK_N 128
+
+#define WARP_M 64
+#define WARP_N 64
+```
+
+int4读取
+
+![2484592-20210730140646081-102511261](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/ac8f84d6-d14c-4dff-9467-5796ed9086cd)
+
+![2484592-20210730140710668-1300877439](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/351b1a66-cb02-4cce-a7f3-6d0026851227)
