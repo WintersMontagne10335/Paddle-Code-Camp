@@ -79,16 +79,6 @@ Shape Constraint。
 在运⾏时，所有的 shape 都可获取，因此可以将真实的 shap e值带⼊符号表达式，其值将落于⼀个区间，即可选择对应的 Bucket，进⽽选
 择最优的 Kernel 进⾏执⾏。
 
-### tvm relax 的解决方法
-
-
-### 其它的解决方法
-- TVM - relax
-- TensorRT - Padding
-- DISC - 阿里 基于 MLIR
-- Nimble - AWS 基于 TVM
-- DietCode - AWS 基于 TVM
-
 ## 符号推导是如何实现的
 ### 基础算子符号推导
 可参照的 PR: [Add InferSymbolicShape for pd_op.nonzero](https://github.com/PaddlePaddle/Paddle/pull/62987)。
@@ -221,10 +211,37 @@ InferSymbolicShape 是如何实现的，这里我们调用
 比如 distribute_fpn_proposals 算子就是这样。这里我们可以参照一下 https://github.com/PaddlePaddle/Paddle/pull/63947/files，修改
 - paddle/fluid/pir/dialect/operator/ir/ops.yaml。
 
-最后说一下 test_infer_sym_shape_unary_op.py，TODO
+test_infer_sym_shape_unary_op.py，主体结构如下。
+
+```Python
+class NonzeroNet(paddle.nn.Layer):
+    def __init__(self):
+        super().__init__()
+
+    def forward(self, x):
+        out_nonzero = paddle.nonzero(x)
+        return out_nonzero
 
 
-注意，以上的内容基本都是针对的 nonzero，所以涉及到的文件为 unary_infer_sym.h, unary_infer_sym.cc, test_infer_sym_shape_unary_op.py，
+class NonzeroOpInferSymbolicShapeTest(TestBase):
+    def prepare_data(self):
+        # 初始化输入 tensor
+        # 初始化预测结果
+
+    def test_eval_symbolic(self):
+        # 检查结果
+```
+
+根据[源码编译](https://www.paddlepaddle.org.cn/documentation/docs/zh/install/compile/linux-compile-by-ninja.html)教程编译安装（需额外开启 -DWITH_CINN=ON 和 -DWITH_TESTING=ON ），
+然后在 test/ir/pir/cinn/symbolic/ 目录下通过以下指令运行单测。
+
+```bash
+GLOG_v=6 FLAGS_call_stack_level=100 FLAGS_check_infer_symbolic=1 FLAGS_enable_pir_api=1 FLAGS_cinn_bucket_compile=True FLAGS_prim_enable_dynamic=true FLAGS_pir_apply_shape_optimization_pass=1 FLAGS_group_schedule_tiling_first=1 FLAGS_cinn_new_group_scheduler=1 python test_infer_sym_shape_unary_op.py  > err.log 2>&1
+```
+
+查看同目录的 err.log 日志文件，检查单测结果。
+
+以上的内容基本都是针对的 nonzero，所以涉及到的文件为 unary_infer_sym.h, unary_infer_sym.cc, test_infer_sym_shape_unary_op.py，
 其它算子可能不在 unary 下，需要根据 InferMeta 所在的文件作调整。
 
 这部分任务比较简单，如果有同学想要入门 ai 编译器的，可以从这里入手。
@@ -236,6 +253,16 @@ InferSymbolicShape 是如何实现的，这里我们调用
 > [Unimplement](https://github.com/search?q=repo%3APaddlePaddle%2FPaddle+path%3A%2F%5Epaddle%5C%2Ffluid%5C%2Fpir%5C%2Fdialect%5C%2Foperator%5C%2Finterface%5C%2Finfer_symbolic_shape%5C%2F%2F+unimplement&type=code)
 >
 > 子图报错相关的，可以联系留杰老师，[相关网址](https://github.com/PaddlePaddle/Paddle/issues/62930)
+
+## 后续补充
+### 详细调研竞品的动态 shape 如何支持的
+- TVM - relax
+- TensorRT - Padding
+- DISC - 阿里 基于 MLIR
+- Nimble - AWS 基于 TVM
+- DietCode - AWS 基于 TVM
+
+### 组合算子、反向算子拆解具体是如何实现的
 
 ## 参考资料
 - [动态 shape 的挑战与解决现状](https://zhuanlan.zhihu.com/p/661889518)
