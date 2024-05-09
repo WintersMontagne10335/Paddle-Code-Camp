@@ -35,16 +35,55 @@ InferMeta 有 shape 推导的功能。
 ![image](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/ba963a4d-2fbd-4195-9cea-631bbc6dc517)
 
 ### 常见的解决方法
+Padding 成 static shape。
+|方案|说明|分析|
+|---|---|---|
+|Naive padding|动态维度，padding 到最大长度|计算效率非常低|
+|分桶|划分多个范围（64, 128，512, 2048, ...），选最小可用的模型，padding 到对应长度|最常用；可能产生组合爆炸|
+|动态编译|第一次执行时，不优化。执行后，根据真实 shape 编译出高性能版本。下次遇到符合的 shape，使用高性能版本|实现复杂；不能保存太多的 compile cache|
+|crop 数据|特别长的 input，数据截断不处理|会影响精度|
 
+Shape Constraint。
+虽然不知道 shape 具体的值，但是可以缩小范围。
+> A + B = C 场景，Add 算子的输入 vector A 和 vector B，shape 是相同的
+
+其它的方法。
+- 改代码、换算子
+- Control Flow 的支持
+- Sequence Mask
+- ...
 
 ### cinn 的解决方法
+符号。
+> 众所周知，⼀个算⼦的计算，在 shape 不同时，性能优化⽅式不同，⽐如需要不同的 Tile 形式。⽽在动态 shape 场景下，编译期⽆法确切
+获得某些维度的shape值，这些shape由符号表示，这些符号的特性是：我们不知道其具体的值，但是在整个编译期间，其值不会发⽣改
+变。
 
+符号推导。
+> 基础算子符号推导：手动实现，可以参照 InferMeta。
+> 
+> 组合算子、反向算子：依据拆解规则拆分成基础算子处理。
+> 
+> 图符号推导：对于⼀个 Program，可以从输⼊ Tensor 开始，以拓扑序的⽅式对所有算⼦进⾏符号推导便可以得到 Program 中所有 Tensor 的
+符号维度信息。
+
+约束。
+> ⽤于保存PIR Program中每个Tensor与对应符号维度信息的映射关系。
+> 
+> ⽤于保存PIR Program不同维度符号间的约束关系（如相等，可⼴播等约束）。
+
+分桶优化。
+
+![image](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/7f27f307-46ba-4a5e-bf04-982dc15d2429)
+
+在运⾏时，所有的 shape 都可获取，因此可以将真实的 shap e值带⼊符号表达式，其值将落于⼀个区间，即可选择对应的 Bucket，进⽽选
+择最优的 Kernel 进⾏执⾏。
 
 ### tvm relax 的解决方法
 
 
 ### 其它的解决方法
-TODO(WintersMontagne1335): 详细调研以下内容
+- TVM - relax
 - TensorRT - Padding
 - DISC - 阿里 基于 MLIR
 - Nimble - AWS 基于 TVM
@@ -197,12 +236,6 @@ InferSymbolicShape 是如何实现的，这里我们调用
 > [Unimplement](https://github.com/search?q=repo%3APaddlePaddle%2FPaddle+path%3A%2F%5Epaddle%5C%2Ffluid%5C%2Fpir%5C%2Fdialect%5C%2Foperator%5C%2Finterface%5C%2Finfer_symbolic_shape%5C%2F%2F+unimplement&type=code)
 >
 > 子图报错相关的，可以联系留杰老师，[相关网址](https://github.com/PaddlePaddle/Paddle/issues/62930)
-
-### 组合算子、反向算子拆分
-TODO(WintersMontagne1335): 调研如何具体实现步骤
-
-### 分桶调优
-TODO(WintersMontagne1335): 调研如何具体实现步骤
 
 ## 参考资料
 - [动态 shape 的挑战与解决现状](https://zhuanlan.zhihu.com/p/661889518)
