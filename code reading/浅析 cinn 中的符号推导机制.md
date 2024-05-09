@@ -14,22 +14,41 @@
 - ShapeOrData
 - Constraints
 
-### 与 InferMeta 有什么区别
+### 与 InferMeta 有什么区别与联系
 
+InferMeta 有 shape 推导的功能。
+
+为什么 cinn 不直接复用 InferMeta，而是另外开发了一套 shape 推导的工具。
+
+|对比方向|InferMeta|InferSymbolicShape|
+|---|---|---|
+|未能推导出的维度大小|-1|新的符号 SX|
+|约束信息|未保存|保存|
+|应用场景|with_cinn=false 或 with_cinn=true 但是 tensor shape 为静态时|with_cinn=true 且 tensor shape 为静态时|
 
 ## 为什么需要符号推导
+### 动态 shape 带来的挑战
 - 编译器需要 shape 信息做优化
 - 为每一个实际输入shape组合生成一份编译结果
 - 动态 shape，且可能变化范围非常大
 
 ![image](https://github.com/WintersMontagne10335/Paddle-Code-Camp/assets/118546135/ba963a4d-2fbd-4195-9cea-631bbc6dc517)
 
-### 什么是动态 shape
+### 常见的解决方法
 
 
+### cinn 的解决方法
 
 
+### tvm relax 的解决方法
 
+
+### 其它的解决方法
+TODO(WintersMontagne1335): 详细调研以下内容
+- TensorRT - Padding
+- DISC - 阿里 基于 MLIR
+- Nimble - AWS 基于 TVM
+- DietCode - AWS 基于 TVM
 
 ## 符号推导是如何实现的
 ### 基础算子符号推导
@@ -179,6 +198,12 @@ InferSymbolicShape 是如何实现的，这里我们调用
 >
 > 子图报错相关的，可以联系留杰老师，[相关网址](https://github.com/PaddlePaddle/Paddle/issues/62930)
 
+### 组合算子、反向算子拆分
+TODO(WintersMontagne1335): 调研如何具体实现步骤
+
+### 分桶调优
+TODO(WintersMontagne1335): 调研如何具体实现步骤
+
 ## 参考资料
 - [动态 shape 的挑战与解决现状](https://zhuanlan.zhihu.com/p/661889518)
 - [AI编译优化--Dynamic Shape Compiler](https://zhuanlan.zhihu.com/p/305546437)
@@ -187,3 +212,4 @@ InferSymbolicShape 是如何实现的，这里我们调用
 - [TVM Relax如何支持dynamic shape](https://zhuanlan.zhihu.com/p/627449108)
 - [如何评价 TVM 在 Relay 之后的新 IR Relax？](https://www.zhihu.com/question/522101384)
 - [TVM分析和使用](https://zhuanlan.zhihu.com/p/690256525)
+- [Nimble(TVM 动态shape解决思路)论文分析](https://zhuanlan.zhihu.com/p/354995641)
