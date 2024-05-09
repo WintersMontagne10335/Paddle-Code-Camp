@@ -33,8 +33,6 @@
 
 ## 符号推导是如何实现的
 ### 基础算子符号推导
-
-
 可参照的 PR: [Add InferSymbolicShape for pd_op.nonzero](https://github.com/PaddlePaddle/Paddle/pull/62987)。
 
 以上面 PR 中的 nonzero 为例，接下来会简述一下新增基础符号算子的一般开发流程。
@@ -141,7 +139,7 @@ InferSymbolicShape 是如何实现的，这里我们调用
 
 具体如何使用可以参照已有的相关代码。
 
-接下来我们说一下 ops.yaml，一般情况下我们直接在 ops.yaml 中算子相关内容的后面添加
+接下来我们说一下 paddle/phi/api/yaml/ops.yaml，一般情况下我们直接在 ops.yaml 中算子相关内容的后面添加
 
 ```yaml
   interfaces : paddle::dialect::InferSymbolicShapeInterface
@@ -161,13 +159,15 @@ InferSymbolicShape 是如何实现的，这里我们调用
   interfaces : paddle::dialect::InferSymbolicShapeInterface
 ```
 
-但是，某些情况下，可能在 ops.yaml 中找不到对应的算子，而是在 
+但是，某些情况下，可能在 paddle/phi/api/yaml/ops.yaml 中找不到对应的算子，而是在 paddle/phi/api/yaml/legacy_ops.yaml 中找到该算子，
+比如 distribute_fpn_proposals 算子就是这样。这里我们可以参照一下 https://github.com/PaddlePaddle/Paddle/pull/63947/files，修改
+- paddle/fluid/pir/dialect/operator/ir/ops.yaml。
+
+最后说一下 test_infer_sym_shape_unary_op.py，TODO
 
 
-
-
-TODO：le 的算子
-
+注意，以上的内容基本都是针对的 nonzero，所以涉及到的文件为 unary_infer_sym.h, unary_infer_sym.cc, test_infer_sym_shape_unary_op.py，
+其它算子可能不在 unary 下，需要根据 InferMeta 所在的文件作调整。
 
 这部分任务比较简单，如果有同学想要入门 ai 编译器的，可以从这里入手。
 
@@ -178,13 +178,6 @@ TODO：le 的算子
 > [Unimplement](https://github.com/search?q=repo%3APaddlePaddle%2FPaddle+path%3A%2F%5Epaddle%5C%2Ffluid%5C%2Fpir%5C%2Fdialect%5C%2Foperator%5C%2Finterface%5C%2Finfer_symbolic_shape%5C%2F%2F+unimplement&type=code)
 >
 > 子图报错相关的，可以联系留杰老师，[相关网址](https://github.com/PaddlePaddle/Paddle/issues/62930)
-
-### 组合算子/反向算子符号推导
-TODO
-
-## 现存问题/解决方案
-TODO
-
 
 ## 参考资料
 - [动态 shape 的挑战与解决现状](https://zhuanlan.zhihu.com/p/661889518)
